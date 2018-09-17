@@ -7,24 +7,27 @@ import com.epam.bdcc.kafka.KafkaHelper;
 import com.epam.bdcc.utils.GlobalConstants;
 import com.epam.bdcc.utils.PropertiesLoader;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.producer.Producer;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.spark.SparkConf;
 import org.apache.spark.TaskContext;
+import org.apache.spark.api.java.JavaPairRDD;
+import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.Optional;
 import org.apache.spark.api.java.function.Function3;
+import org.apache.spark.api.java.function.PairFunction;
 import org.apache.spark.streaming.Duration;
 import org.apache.spark.streaming.State;
 import org.apache.spark.streaming.StateSpec;
 import org.apache.spark.streaming.api.java.*;
-import org.apache.spark.streaming.kafka010.*;
+import org.apache.spark.streaming.kafka010.KafkaUtils;
+import org.apache.spark.streaming.kafka010.LocationStrategies;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
 import scala.Tuple2;
 
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Properties;
+import java.util.*;
 
 public class AnomalyDetector implements GlobalConstants {
     /**
@@ -54,32 +57,32 @@ public class AnomalyDetector implements GlobalConstants {
             JavaSparkContext sc = new JavaSparkContext(conf);
             JavaStreamingContext jssc = new JavaStreamingContext(sc, batchDuration);
 
-            JavaInputDStream<ConsumerRecord<String, MonitoringRecord>> stream =
+            JavaDStream<MonitoringRecord> stream =
                 KafkaUtils.createDirectStream(
                     jssc,
                     LocationStrategies.PreferConsistent(),
                     KafkaHelper.createConsumerStrategy(rawTopicName)
-                );
+                ).map(ConsumerRecord::value);
 
-            JavaDStream<MonitoringRecord> lines = stream.map(ConsumerRecord::value);
-            JavaPairDStream<String, MonitoringRecord> javaPairDStream = lines.mapToPair(record -> new Tuple2<>(KafkaHelper.getKey(record), record));
-            javaPairDStream.print(2);
-            JavaMapWithStateDStream<String, MonitoringRecord, HTMNetwork, MonitoringRecord> stateDstream = javaPairDStream.mapWithState(StateSpec.function(mappingFunc));
+            JavaPairDStream<String, MonitoringRecord> pairDStream = stream.mapToPair(
+                record -> new Tuple2<>(KafkaHelper.getKey(record), record)
+            );
+            JavaMapWithStateDStream<String, MonitoringRecord, HTMNetwork, MonitoringRecord> stateDStream = pairDStream.mapWithState(StateSpec.function(mappingFunc));
+            stateDStream.print();
 
-            stateDstream.print();
-
-//            stream.foreachRDD(rdd -> {
-//                OffsetRange[] offsetRanges = ((HasOffsetRanges) rdd.rdd()).offsetRanges();
-//                rdd.foreachPartition(consumerRecords -> {
-//                    OffsetRange o = offsetRanges[TaskContext.get().partitionId()];
-//                    System.out.println(
-//                        o.topic() + " " + o.partition() + " " + o.fromOffset() + " " + o.untilOffset());
-//                });
-//            });
+            stateDStream.foreachRDD(rdd -> {
+                rdd.foreachPartition(partitionOfRecords -> {
+                    Producer<String, MonitoringRecord> producer = KafkaHelper.createProducer();
+                    while (partitionOfRecords.hasNext()) {
+                        MonitoringRecord record = partitionOfRecords.next();
+                        System.out.println(producer.send(new ProducerRecord<>(enrichedTopicName, KafkaHelper.getKey(record), record)).get());
+                    }
+                    producer.close();
+                });
+            });
 
             jssc.checkpoint(checkpointDir);
             stream.checkpoint(checkpointInterval);
-
 
             jssc.start();
             jssc.awaitTermination();
