@@ -68,7 +68,6 @@ public class AnomalyDetector implements GlobalConstants {
                 record -> new Tuple2<>(KafkaHelper.getKey(record), record)
             );
             JavaMapWithStateDStream<String, MonitoringRecord, HTMNetwork, MonitoringRecord> stateDStream = pairDStream.mapWithState(StateSpec.function(mappingFunc));
-            stateDStream.print();
 
             stateDStream.foreachRDD(rdd -> {
                 rdd.foreachPartition(partitionOfRecords -> {
@@ -90,30 +89,30 @@ public class AnomalyDetector implements GlobalConstants {
     }
 
     private static Function3<String, Optional<MonitoringRecord>, State<HTMNetwork>, MonitoringRecord> mappingFunc =
-            (deviceID, recordOpt, state) -> {
-                // case 0: timeout
-                if (!recordOpt.isPresent())
-                    return null;
+        (deviceID, recordOpt, state) -> {
+            // case 0: timeout
+            if (!recordOpt.isPresent())
+                return null;
 
-                // either new or existing device
-                if (!state.exists())
-                    state.update(new HTMNetwork(deviceID));
-                HTMNetwork htmNetwork = state.get();
-                String stateDeviceID = htmNetwork.getId();
-                if (!stateDeviceID.equals(deviceID))
-                    throw new Exception("Wrong behaviour of Spark: stream key is $deviceID%s, while the actual state key is $stateDeviceID%s");
-                MonitoringRecord record = recordOpt.get();
+            // either new or existing device
+            if (!state.exists())
+                state.update(new HTMNetwork(deviceID));
+            HTMNetwork htmNetwork = state.get();
+            String stateDeviceID = htmNetwork.getId();
+            if (!stateDeviceID.equals(deviceID))
+                throw new Exception("Wrong behaviour of Spark: stream key is $deviceID%s, while the actual state key is $stateDeviceID%s");
+            MonitoringRecord record = recordOpt.get();
 
-                // get the value of DT and Measurement and pass it to the HTM
-                HashMap<String, Object> m = new java.util.HashMap<>();
-                m.put("DT", DateTime.parse(record.getDateGMT() + " " + record.getTimeGMT(), DateTimeFormat.forPattern("YY-MM-dd HH:mm")));
-                m.put("Measurement", Double.parseDouble(record.getSampleMeasurement()));
-                ResultState rs = htmNetwork.compute(m);
-                record.setPrediction(rs.getPrediction());
-                record.setError(rs.getError());
-                record.setAnomaly(rs.getAnomaly());
-                record.setPredictionNext(rs.getPredictionNext());
+            // get the value of DT and Measurement and pass it to the HTM
+            HashMap<String, Object> m = new java.util.HashMap<>();
+            m.put("DT", DateTime.parse(record.getDateGMT() + " " + record.getTimeGMT(), DateTimeFormat.forPattern("YY-MM-dd HH:mm")));
+            m.put("Measurement", Double.parseDouble(record.getSampleMeasurement()));
+            ResultState rs = htmNetwork.compute(m);
+            record.setPrediction(rs.getPrediction());
+            record.setError(rs.getError());
+            record.setAnomaly(rs.getAnomaly());
+            record.setPredictionNext(rs.getPredictionNext());
 
-                return record;
-            };
+            return record;
+        };
 }

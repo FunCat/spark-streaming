@@ -13,22 +13,14 @@ public class MonitoringRecordPartitioner extends DefaultPartitioner {
 
     public int partition(String topic, Object key, byte[] keyBytes, Object value, byte[] valueBytes, Cluster cluster) {
         if (value instanceof MonitoringRecord) {
-            int partition = 0;
-            String date = ((MonitoringRecord) value).getDateOfLastChange().split("-")[2];
-            if(date != null){
-                return Integer.parseInt(date) % 10;
-            }
-            return partition;
-
-
-            //TODO : Add implementation for MonitoringRecord Partitioner
-//            throw new UnsupportedOperationException("Add implementation for MonitoringRecord Partitioner");
+            return KafkaHelper.getKey((MonitoringRecord) value).hashCode() % 10;
         } else {
             return super.partition(topic, key, keyBytes, value, valueBytes, cluster);
         }
     }
 
     public void close() {
+        super.close();
         //TODO : Add implementation for close, if needed
         throw new UnsupportedOperationException("Add implementation for close");
     }

@@ -7,6 +7,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.spark.streaming.api.java.JavaInputDStream;
 import org.apache.spark.streaming.api.java.JavaPairDStream;
 import org.apache.spark.streaming.kafka010.ConsumerStrategies;
@@ -45,7 +46,8 @@ public class TopicGenerator implements GlobalConstants {
                 stream.forEach(line -> {
                     try {
                         MonitoringRecord monitoringRecord = new MonitoringRecord(line.split(","));
-                        System.out.println(producer.send(new ProducerRecord<>(topicName, KafkaHelper.getKey(monitoringRecord), monitoringRecord)).get());
+                        RecordMetadata recordMetadata = producer.send(new ProducerRecord<>(topicName, KafkaHelper.getKey(monitoringRecord), monitoringRecord)).get();
+                        LOGGER.info(recordMetadata.toString());
                     } catch (InterruptedException | ExecutionException e) {
                         e.printStackTrace();
                     }
