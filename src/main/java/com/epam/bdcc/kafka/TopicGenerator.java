@@ -34,15 +34,15 @@ public class TopicGenerator implements GlobalConstants {
         Properties applicationProperties = PropertiesLoader.getGlobalProperties();
         if (!applicationProperties.isEmpty()) {
             final boolean skipHeader = Boolean
-                    .parseBoolean(applicationProperties.getProperty(GENERATOR_SKIP_HEADER_CONFIG));
+                .parseBoolean(applicationProperties.getProperty(GENERATOR_SKIP_HEADER_CONFIG));
             final long batchSleep = Long.parseLong(applicationProperties.getProperty(GENERATOR_BATCH_SLEEP_CONFIG));
             final int batchSize = Integer.parseInt(applicationProperties.getProperty(BATCH_SIZE_CONFIG));
             final String sampleFile = applicationProperties.getProperty(GENERATOR_SAMPLE_FILE_CONFIG);
             final String topicName = applicationProperties.getProperty(KAFKA_RAW_TOPIC_CONFIG);
 
-            Producer<String, MonitoringRecord> producer = KafkaHelper.createProducer();
+            try (Stream<String> stream = Files.lines(Paths.get(sampleFile));
+                 Producer<String, MonitoringRecord> producer = KafkaHelper.createProducer()) {
 
-            try (Stream<String> stream = Files.lines(Paths.get(sampleFile))) {
                 stream.forEach(line -> {
                     try {
                         MonitoringRecord monitoringRecord = new MonitoringRecord(line.split(","));
@@ -55,14 +55,6 @@ public class TopicGenerator implements GlobalConstants {
             } catch (IOException e) {
                 LOGGER.error("Fail to read the text file", e);
             }
-
-
-            //TODO : Read the file (one_device_2015-2017.csv) and push records to Kafka raw topic.
-//            throw new UnsupportedOperationException("Read the file (one_device_2015-2017.csv) and push records to Kafka raw topic.");
         }
-    }
-
-    private static Producer<String, MonitoringRecord> createProducer(Properties props){
-        return new KafkaProducer<>(props);
     }
 }

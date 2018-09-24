@@ -13,7 +13,7 @@ public class MonitoringRecordPartitioner extends DefaultPartitioner {
 
     public int partition(String topic, Object key, byte[] keyBytes, Object value, byte[] valueBytes, Cluster cluster) {
         if (value instanceof MonitoringRecord) {
-            return KafkaHelper.getKey((MonitoringRecord) value).hashCode() % 10;
+            return Math.abs(KafkaHelper.getKey((MonitoringRecord) value).hashCode()) % 10;
         } else {
             return super.partition(topic, key, keyBytes, value, valueBytes, cluster);
         }
@@ -21,12 +21,8 @@ public class MonitoringRecordPartitioner extends DefaultPartitioner {
 
     public void close() {
         super.close();
-        //TODO : Add implementation for close, if needed
-        throw new UnsupportedOperationException("Add implementation for close");
     }
 
     public void configure(Map<String, ?> map) {
-        //TODO : Add implementation for configure, if needed
-//        throw new UnsupportedOperationException("Add implementation for configure");
     }
 }
