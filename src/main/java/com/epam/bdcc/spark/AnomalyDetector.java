@@ -30,16 +30,7 @@ import scala.Tuple2;
 import java.util.*;
 
 public class AnomalyDetector implements GlobalConstants {
-    /**
-     * TODO :
-     * 1. Define Spark configuration (register serializers, if needed)
-     * 2. Initialize streaming context with checkpoint directory
-     * 3. Read records from kafka topic "monitoring20" (com.epam.bdcc.kafka.KafkaHelper can help)
-     * 4. Organized records by key and map with HTMNetwork state for each device
-     * (com.epam.bdcc.kafka.KafkaHelper.getKey - unique key for the device),
-     * for detecting anomalies and updating HTMNetwork state (com.epam.bdcc.spark.AnomalyDetector.mappingFunc can help)
-     * 5. Send enriched records to topic "monitoringEnriched2" for further visualization
-     **/
+
     public static void main(String[] args) throws Exception {
         //load a properties file from class path, inside static method
         final Properties applicationProperties = PropertiesLoader.getGlobalProperties();
@@ -69,16 +60,14 @@ public class AnomalyDetector implements GlobalConstants {
             );
             JavaMapWithStateDStream<String, MonitoringRecord, HTMNetwork, MonitoringRecord> stateDStream = pairDStream.mapWithState(StateSpec.function(mappingFunc));
 
-            stateDStream.foreachRDD(rdd -> {
-                rdd.foreachPartition(partitionOfRecords -> {
-                    Producer<String, MonitoringRecord> producer = KafkaHelper.createProducer();
-                    while (partitionOfRecords.hasNext()) {
-                        MonitoringRecord record = partitionOfRecords.next();
-                        System.out.println(producer.send(new ProducerRecord<>(enrichedTopicName, KafkaHelper.getKey(record), record)).get());
-                    }
-                    producer.close();
-                });
-            });
+            stateDStream.foreachRDD(rdd -> rdd.foreachPartition(partitionOfRecords -> {
+                Producer<String, MonitoringRecord> producer = KafkaHelper.createProducer();
+                while (partitionOfRecords.hasNext()) {
+                    MonitoringRecord record = partitionOfRecords.next();
+                    System.out.println(producer.send(new ProducerRecord<>(enrichedTopicName, KafkaHelper.getKey(record), record)).get());
+                }
+                producer.close();
+            }));
 
             jssc.checkpoint(checkpointDir);
             stream.checkpoint(checkpointInterval);
