@@ -1,16 +1,16 @@
 package com.epam.bdcc.kafka;
 
 import com.epam.bdcc.htm.MonitoringRecord;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.Assert.assertEquals;
 
-class MonitoringRecordPartitionerTest {
+public class MonitoringRecordPartitionerTest {
 
     private MonitoringRecordPartitioner partitioner = new MonitoringRecordPartitioner();
 
     @Test
-    void partition() {
+    public void partition() {
         String topic = "monitoring20";
         String key = "10-001-0002-44201-1";
         MonitoringRecord record = new MonitoringRecord("10", "001", "0002", "44201", "1", "38.986672",
